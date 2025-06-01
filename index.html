@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>专项分期风险分析</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     :root {
@@ -35,13 +34,13 @@
       padding: 30px;
     }
 
-    label, select, input[type="file"], button {
+    label, select, button {
       margin: 8px 5px;
       padding: 8px;
       font-size: 14px;
     }
 
-    select, input[type="file"] {
+    select {
       border: 1px solid #ccc;
       border-radius: 5px;
     }
@@ -71,7 +70,6 @@
       line-height: 1.6;
     }
 
-    /* Tabs */
     .tabs {
       margin-top: 20px;
     }
@@ -132,9 +130,6 @@
       </div>
 
       <div id="tab1" class="tab-content" style="display: block;">
-        <label>上传Excel文件：</label>
-        <input type="file" id="upload" accept=".xlsx" /><br>
-
         <label>选择分行：</label>
         <select id="orgs" multiple></select><br>
 
@@ -183,7 +178,54 @@
       evt.currentTarget.classList.add("active");
     }
 
-    let globalData = [];
+    const rawData = [
+      {
+        "datadate": 20240131,
+        "pdtyp": "0_汽车分期",
+        "orgnam": "安徽省分行",
+        "cnt": 35877,
+        "yq_cnt": 293,
+        "bad_cnt": 60,
+        "bl_cnt": 13,
+        "yq_acc_r": 0.0082,
+        "bad_acc_r": 0.0017,
+        "bl_acc_r": 0.0004,
+        "bal": 58.957306,
+        "yq_bal": 0.508032,
+        "bad_bal": 0.099493,
+        "bl_bal": 0.025562,
+        "yq_rate": 0.008617,
+        "bad_rate": 0.001688,
+        "bl_rate": 0.000434
+      },
+      {
+        "datadate": 20240131,
+        "pdtyp": "0_汽车分期",
+        "orgnam": "北京市分行",
+        "cnt": 3033,
+        "yq_cnt": 1,
+        "bad_cnt": 0,
+        "bl_cnt": 0,
+        "yq_acc_r": 0.0003,
+        "bad_acc_r": 0,
+        "bl_acc_r": 0,
+        "bal": 4.444645,
+        "yq_bal": 0.0009,
+        "bad_bal": 0,
+        "bl_bal": 0,
+        "yq_rate": 0.000202,
+        "bad_rate": 0,
+        "bl_rate": 0
+      }
+    ];
+
+    const globalData = rawData.map(row => {
+      const dateStr = String(row.datadate);
+      return {
+        ...row,
+        dateObj: new Date(`${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`)
+      };
+    });
 
     const indicatorMap = {
       yq_acc_r: '逾期账户占比',
@@ -193,28 +235,6 @@
       bad_rate: '坏率',
       bl_rate: '不良率'
     };
-
-    document.getElementById('upload').addEventListener('change', function (e) {
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(sheet);
-
-        globalData = json.map(row => {
-          const dateStr = String(row.datadate);
-          return {
-            ...row,
-            dateObj: new Date(`${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`)
-          };
-        });
-
-        populateFilters(globalData);
-      };
-      reader.readAsArrayBuffer(e.target.files[0]);
-    });
 
     function populateFilters(data) {
       const orgSet = new Set(data.map(r => r.orgnam));
@@ -270,10 +290,7 @@
 
       Plotly.newPlot('chart', traces, {
         title: `${indicatorMap[indicator]} 随时间变化`,
-        xaxis: {
-          title: '时间',
-          tickformat: '%Y-%m-%d'
-        },
+        xaxis: { title: '时间' },
         yaxis: {
           title: indicatorMap[indicator],
           tickformat: '.2f',
@@ -335,6 +352,11 @@
 
       analysisDiv.innerHTML = analysisText;
     }
+
+    // 初始化填充筛选项
+    window.onload = function () {
+      populateFilters(globalData);
+    };
   </script>
 </body>
 </html>
