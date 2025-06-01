@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>专项分期风险分析</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    :root {
+      --main-bg: rgb(211,237,237);
+      --main-color: rgb(0,152,130);
+      --accent-color: rgb(20,180,160);
+      --text-color: #000;
+    }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--main-bg);
+      color: var(--text-color);
+    }
+
+    header {
+      background-color: var(--main-color);
+      padding: 20px 0;
+      text-align: center;
+      color: white;
+      font-size: 28px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    main {
+      padding: 30px;
+    }
+
+    label, select, input[type="file"], button {
+      margin: 8px 5px;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    select, input[type="file"] {
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      background-color: var(--main-color);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: var(--accent-color);
+    }
+
+    #chart {
+      width: 100%;
+      max-width: 1000px;
+      height: 500px;
+      margin-top: 30px;
+    }
+
+    #analysis {
+      margin-top: 20px;
+      font-weight: bold;
+      line-height: 1.6;
+    }
+
+    /* Tabs */
+    .tabs {
+      margin-top: 20px;
+    }
+
+    .tab-buttons {
+      display: flex;
+      border-bottom: 3px solid var(--main-color);
+      background-color: var(--main-bg);
+      padding: 5px;
+    }
+
+    .tab-btn {
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-right: 5px;
+      border-radius: 8px 8px 0 0;
+      transition: background-color 0.3s ease;
+    }
+
+    .tab-btn:hover {
+      background-color: var(--main-color);
+    }
+
+    .tab-btn.active {
+      background-color: white;
+      color: var(--main-color);
+      border-bottom: 3px solid white;
+    }
+
+    .tab-content {
+      display: none;
+      background-color: white;
+      padding: 20px;
+      border-radius: 0 0 8px 8px;
+      border: 1px solid var(--main-color);
+      margin-top: -1px;
+    }
+
+    .tab-content p {
+      color: var(--text-color);
+    }
+  </style>
+</head>
+<body>
+  <header>区域风险可视化分析平台</header>
+
+  <main>
+    <div class="tabs">
+      <div class="tab-buttons">
+        <button class="tab-btn active" onclick="openTab(event, 'tab1')">专项区域风险分析</button>
+        <button class="tab-btn" onclick="openTab(event, 'tab2')">Tab 2</button>
+        <button class="tab-btn" onclick="openTab(event, 'tab3')">Tab 3</button>
+        <button class="tab-btn" onclick="openTab(event, 'tab4')">Tab 4</button>
+      </div>
+
+      <div id="tab1" class="tab-content" style="display: block;">
+        <label>上传Excel文件：</label>
+        <input type="file" id="upload" accept=".xlsx" /><br>
+
+        <label>选择分行：</label>
+        <select id="orgs" multiple></select><br>
+
+        <label>选择产品：</label>
+        <select id="products" multiple></select><br>
+
+        <label>选择指标：</label>
+        <select id="indicator">
+          <option value="yq_acc_r">逾期账户占比</option>
+          <option value="bad_acc_r">坏账户占比</option>
+          <option value="bl_acc_r">不良账户占比</option>
+          <option value="yq_rate">逾期率</option>
+          <option value="bad_rate">坏率</option>
+          <option value="bl_rate">不良率</option>
+        </select>
+
+        <button onclick="drawChart()">绘图</button>
+
+        <div id="chart"></div>
+        <div id="analysis"></div>
+      </div>
+
+      <div id="tab2" class="tab-content">
+        <p>Tab 2 内容待添加...</p>
+      </div>
+
+      <div id="tab3" class="tab-content">
+        <p>Tab 3 内容待添加...</p>
+      </div>
+
+      <div id="tab4" class="tab-content">
+        <p>Tab 4 内容待添加...</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function openTab(evt, tabId) {
+      const tabContents = document.querySelectorAll(".tab-content");
+      const tabButtons = document.querySelectorAll(".tab-btn");
+
+      tabContents.forEach(tab => tab.style.display = "none");
+      tabButtons.forEach(btn => btn.classList.remove("active"));
+
+      document.getElementById(tabId).style.display = "block";
+      evt.currentTarget.classList.add("active");
+    }
+
+    let globalData = [];
+
+    const indicatorMap = {
+      yq_acc_r: '逾期账户占比',
+      bad_acc_r: '坏账户占比',
+      bl_acc_r: '不良账户占比',
+      yq_rate: '逾期率',
+      bad_rate: '坏率',
+      bl_rate: '不良率'
+    };
+
+    document.getElementById('upload').addEventListener('change', function (e) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(sheet);
+
+        globalData = json.map(row => {
+          const dateStr = String(row.datadate);
+          return {
+            ...row,
+            dateObj: new Date(`${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`)
+          };
+        });
+
+        populateFilters(globalData);
+      };
+      reader.readAsArrayBuffer(e.target.files[0]);
+    });
+
+    function populateFilters(data) {
+      const orgSet = new Set(data.map(r => r.orgnam));
+      const pdSet = new Set(data.map(r => r.pdtyp));
+
+      const orgSelect = document.getElementById('orgs');
+      const pdSelect = document.getElementById('products');
+      orgSelect.innerHTML = "";
+      pdSelect.innerHTML = "";
+
+      orgSet.forEach(org => {
+        const opt = document.createElement('option');
+        opt.value = opt.text = org;
+        orgSelect.appendChild(opt);
+      });
+
+      pdSet.forEach(pd => {
+        const opt = document.createElement('option');
+        opt.value = opt.text = pd;
+        pdSelect.appendChild(opt);
+      });
+    }
+
+    function getSelectedValues(select) {
+      return Array.from(select.selectedOptions).map(opt => opt.value);
+    }
+
+    function drawChart() {
+      const orgs = getSelectedValues(document.getElementById('orgs'));
+      const products = getSelectedValues(document.getElementById('products'));
+      const indicator = document.getElementById('indicator').value;
+
+      const traces = [];
+
+      orgs.forEach(org => {
+        products.forEach(prod => {
+          const series = globalData
+            .filter(r => r.orgnam === org && r.pdtyp === prod && r[indicator] != null)
+            .sort((a, b) => a.dateObj - b.dateObj);
+
+          const x = series.map(r => r.dateObj.toISOString().split('T')[0]);
+          const y = series.map(r => parseFloat(r[indicator]) * 100);
+
+          traces.push({
+            x,
+            y,
+            mode: 'lines+markers',
+            name: `${org}-${prod}`,
+            hovertemplate: '%{y:.2f}%',
+          });
+        });
+      });
+
+      Plotly.newPlot('chart', traces, {
+        title: `${indicatorMap[indicator]} 随时间变化`,
+        xaxis: {
+          title: '时间',
+          tickformat: '%Y-%m-%d'
+        },
+        yaxis: {
+          title: indicatorMap[indicator],
+          tickformat: '.2f',
+          ticksuffix: '%'
+        },
+        margin: { t: 40 }
+      });
+
+      generateAnalysis(orgs, products, indicator);
+    }
+
+    function generateAnalysis(orgs, products, indicator) {
+      const analysisDiv = document.getElementById('analysis');
+      let analysisText = "";
+
+      orgs.forEach(org => {
+        products.forEach(prod => {
+          const rows = globalData.filter(r => r.orgnam === org && r.pdtyp === prod && r[indicator] != null)
+            .sort((a, b) => a.dateObj - b.dateObj);
+
+          if (rows.length === 0) {
+            analysisText += `<p>${org} 的 ${prod} 没有可用数据。</p>`;
+            return;
+          }
+
+          const latest = rows[rows.length - 1];
+          const currentVal = latest[indicator] * 100;
+
+          const prevMonth = new Date(latest.dateObj);
+          prevMonth.setMonth(prevMonth.getMonth() - 1);
+          const yoyMonth = new Date(latest.dateObj);
+          yoyMonth.setFullYear(yoyMonth.getFullYear() - 1);
+
+          const prev = rows.find(r =>
+            r.dateObj.getFullYear() === prevMonth.getFullYear() &&
+            r.dateObj.getMonth() === prevMonth.getMonth());
+
+          const yoy = rows.find(r =>
+            r.dateObj.getFullYear() === yoyMonth.getFullYear() &&
+            r.dateObj.getMonth() === yoyMonth.getMonth());
+
+          const allRow = globalData.find(r =>
+            r.orgnam === "全行" && r.pdtyp === prod &&
+            r.dateObj.getFullYear() === latest.dateObj.getFullYear() &&
+            r.dateObj.getMonth() === latest.dateObj.getMonth()
+          );
+
+          const pct = (now, base) => `${((now - base) * 1).toFixed(2)}%`;
+
+          let msg = `<p>${org} 的 ${prod} 最新的 ${indicatorMap[indicator]} 是 ${currentVal.toFixed(2)}%。`;
+          msg += prev ? ` 环比变化 ${pct(currentVal, prev[indicator] * 100)}。` : ' 无前一月数据。';
+          msg += yoy ? ` 同比变化 ${pct(currentVal, yoy[indicator] * 100)}。` : ' 无去年同期数据。';
+          msg += allRow ? ` 与全行（${(allRow[indicator] * 100).toFixed(2)}%）相比，`
+            + (currentVal > allRow[indicator] * 100 ? '偏高' : '偏低') + '。</p>' : ' 无全行数据。</p>';
+
+          analysisText += msg;
+        });
+      });
+
+      analysisDiv.innerHTML = analysisText;
+    }
+  </script>
+</body>
+</html>
