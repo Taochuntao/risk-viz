@@ -411,12 +411,12 @@ main {
                     const latest = rows[rows.length - 1];
                     const currentVal = latest[indicator] * 100;
 
-                    //const prevMonth = new Date(latest.dateObj);
-                    //prevMonth.setMonth(prevMonth.getMonth() - 1);
-                    //const yoyMonth = new Date(latest.dateObj);
-                    //yoyMonth.setFullYear(yoyMonth.getFullYear() - 1);
-                    const preMonth = new Date(latest.dateObj.getFullYear(), latest.dateObj.getMonth(), 0);
-                    const yoyMonth = new Date(latest.dateObj.getFullYear()-1, latest.dateObj.getMonth()+1, 0);
+                    const prevMonth = new Date(latest.dateObj);
+                    prevMonth.setMonth(prevMonth.getMonth() - 1);
+                    const yoyMonth = new Date(latest.dateObj);
+                    yoyMonth.setFullYear(yoyMonth.getFullYear() - 1);
+                    //const preMonth = new Date(latest.dateObj.getFullYear(), latest.dateObj.getMonth(), 0);
+                    //const yoyMonth = new Date(latest.dateObj.getFullYear()-1, latest.dateObj.getMonth()+1, 0);
 
                     const prev = rows.find(r =>
                         r.dateObj.getFullYear() === prevMonth.getFullYear() &&
